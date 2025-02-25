@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thee App - SSO I Work</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <img src="Got_Web.gif" 
+    alt="Thee App logo" 
+    width="100">
+    <h1>Get Thee App</h1>
+    <p>STEM U Cation & Prometheus ID</p>
+    <p><a href="https://mediadreamsllc.com/" target="_blank">Visit Media Dreams LLC</a></p>
+    <button onclick="showLoginPopup()" id="loginButton">Login & Ask Afrend</button>
+    <p id="loginResponse"></p>
+
+    <!-- Login Popup -->
+    <div id="loginPopup" class="popup">
+        <button onclick="loginWithMock()">Mock Login</button>
+        <button onclick="loginWithEntra()">Microsoft Entra ID</button>
+        <button onclick="loginWithX()">X Platform</button>
+        <button onclick="loginWithFacebook()">Facebook</button>
+        <button onclick="closeLoginPopup()" class="close-btn">Close</button>
+    </div>
+
+    <!-- Afrend UI -->
+    <div id="afrendSection" class="hidden">
+        <input type="text" id="afrendPrompt" placeholder="Ask Afrend anything...">
+        <button onclick="askAfrend()" id="askButton">Ask Afrend</button>
+        <button onclick="logout()" id="logoutButton">Logout</button>
+        <p id="afrendResponse">Attendance pending...</p>
+    </div>
+
+    <script>
+        const xaiApiKey = "xai-JnYl1CHNsyjtDodpKxhHyU49O7s5wYL5tWA0jb1yHrnnFhbr5L2Vn04A7rkotzoIFJ5s27QJaRHIMOOz";
+        const xaiUrl = "https://api.x.ai/v1/chat/completions";
+        let prometheusId = null;
+
+        function showLoginPopup() {
+            document.getElementById("loginPopup").style.display = "block";
+        }
+
+        function closeLoginPopup() {
+            document.getElementById("loginPopup").style.display = "none";
+        }
+
+        async function loginWithMock() {
+            const mockUser = "student1@mock.id";
+            prometheusId = btoa(mockUser + "-mock-biometric");
+            handleLoginSuccess(mockUser, "Mock ID");
+        }
+
+        //async function loginWithEntra() {
+        //    const mockUser = "student1@entra.mock";
+        //    prometheusId = btoa(mockUser + "-entra-biometric");
+        //    handleLoginSuccess(mockUser, "Entra ID");
+        //}
+		    // Office 365 SSO Config
+        const clientId = "YOUR_AZURE_APP_CLIENT_ID"; // From Azure App Registration
+        const tenantId = "YOUR_TENANT_ID"; // Your Office 365 tenant ID
+        const redirectUri = "http://localhost:8000"; // Local dev redirect URI
+        const scope = "openid profile email User.Read"; // Basic scopes
+        const clientSecret = "YOUR_CLIENT_SECRET"; // From Azure - KEEP SECRET
+
+        function loginWithEntra() {
+            const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
+                `client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}` +
+                `&scope=${encodeURIComponent(scope)}&response_mode=query`;
+            window.location.href = authUrl;
+        }
+
+        async function fetchSSOToken(code) {
+            const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+            const body = new URLSearchParams({
+                client_id: clientId,
+                scope: scope,
+                code: code,
+                redirect_uri: redirectUri,
+                grant_type: "authorization_code",
+                client_secret: clientSecret
+            });
+
+            const response = await fetch(tokenUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: body
+            });
+
+            if (!response.ok) throw new Error(`Token fetch failed: ${response.status}`);
+            const data = await response.json();
+            return data.access_token;
+        }
+
+        async function loginWithX() {
+            const clientId = "YOUR_X_CLIENT_ID";
+            const redirectUri = "http://localhost:8000";
+            const authUrl = `https://api.twitter.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=users.read`;
+            window.location.href = authUrl;
+        }
+
+        async function loginWithFacebook() {
+            const appId = "YOUR_FB_APP_ID";
+            const redirectUri = "http://localhost:8000";
+            const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=email`;
+            window.location.href = authUrl;
+        }
+
+        async function handleOAuthCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get("code");
+            if (code) {
+                let provider, userId;
+                if (window.location.href.includes("x_callback")) {
+                    provider = "X Platform";
+                    userId = await fetchXToken(code);
+                } else {
+                    provider = "Facebook";
+                    userId = await fetchFBToken(code);
+                }
+                prometheusId = btoa(userId + `-${provider.toLowerCase()}-biometric`);
+                handleLoginSuccess(userId, provider);
+            }
+        }
+
+        async function fetchXToken(code) {
+            return "x_user_mock123";
+        }
+
+        async function fetchFBToken(code) {
+            return "fb_user_mock456";
+        }
+
+        async function handleLoginSuccess(userId, provider) {
+            document.getElementById("loginPopup").style.display = "none";
+            document.getElementById("loginButton").classList.add("hidden");
+            document.getElementById("loginResponse").innerText = 
+                `Logged in as ${userId} via ${provider} (Prometheus ID: ${prometheusId})`;
+
+            if (await checkLocation()) {
+                markAttendance(prometheusId);
+                showAfrendUI();
+            } else {
+                document.getElementById("afrendResponse").innerText = 
+                    "Wrong spot—move to class, human!";
+            }
+        }
+
+        async function checkLocation() {
+            return true; // Mock success
+        }
+
+        function markAttendance(id) {
+            document.getElementById("afrendResponse").innerText = 
+                `Attendance recorded for ${id} at ${new Date().toLocaleTimeString()}`;
+        }
+
+        function showAfrendUI() {
+            document.getElementById("afrendSection").classList.remove("hidden");
+        }
+
+        function logout() {
+            prometheusId = null;
+            document.getElementById("afrendSection").classList.add("hidden");
+            document.getElementById("loginButton").classList.remove("hidden");
+            document.getElementById("loginResponse").innerText = "Succesful Logout...";
+            document.getElementById("afrendResponse").innerText = "Attendance pending...";
+            document.getElementById("afrendPrompt").value = "";
+        }
+
+        async function askAfrend() {
+            const prompt = document.getElementById("afrendPrompt").value || "What’s cooking in class?";
+            try {
+                const response = await fetch(xaiUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${xaiApiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: "grok-beta",
+                        messages: [{ role: "user", content: prompt }],
+                        max_tokens: 50
+                    })
+                });
+                if (!response.ok) throw new Error(`xAI error: ${response.status}`);
+                const data = await response.json();
+                document.getElementById("afrendResponse").innerText = data.choices[0].message.content;
+            } catch (error) {
+                document.getElementById("afrendResponse").innerText = `Afrend’s mute: ${error.message}`;
+            }
+        }
+
+        window.onload = handleOAuthCallback;
+    </script>
+</body>
+</html>
